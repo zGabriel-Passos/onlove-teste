@@ -42,7 +42,7 @@ export default function CriarSite() {
       // 2. Tenta gerar o pagamento
       const response = await fetch('/api/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           slug: slug,
           couple: coupleName,
@@ -115,4 +115,4 @@ export default function CriarSite() {
       </form>
     </main>
   );
-}
+} // <--- Esta chave fecha o export default function CriarSite()
