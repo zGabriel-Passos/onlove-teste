@@ -1,6 +1,7 @@
-import { db } from "@/lib/firebase"; // Ajuste o caminho conforme sua estrutura
+import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { notFound } from "next/navigation";
+import QuizWrapper from "@/components/QuizWrapper"; // Vamos criar este componente
 
 interface LoveData {
   couple: string;
@@ -8,97 +9,118 @@ interface LoveData {
   letter: string;
   paid: boolean;
   themeColor: string;
+  spotifyId?: string;
   seed?: number;
+  quiz?: { pergunta: string; resposta: string }[];
 }
 
-// Definição correta para Next.js 15
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
 export default async function LovePage({ params }: PageProps) {
-  // 1. RESOLVE A PROMISE DO PARAMS (Obrigatório no Next 15)
   const { slug } = await params;
 
-  // 2. VALIDAÇÃO DE SEGURANÇA
-  // Se o slug não existir por algum motivo, para aqui e evita erro no Firebase
-  if (!slug) {
-    console.error("Slug não encontrado nos parâmetros da URL");
-    notFound();
-  }
+  if (!slug) notFound();
 
   try {
-    // 3. BUSCA NO FIREBASE
-    // Usamos o 'slug' que veio da URL para buscar o Document ID no Firestore
     const docRef = doc(db, "sites", slug);
     const docSnap = await getDoc(docRef);
 
-    // Se o ID 'pedro' não existir na coleção 'sites', mostra 404
-    if (!docSnap.exists()) {
-      console.log(`Documento com ID "${slug}" não existe no Firestore.`);
-      notFound();
-    }
+    if (!docSnap.exists()) notFound();
 
     const data = docSnap.data() as LoveData;
 
-    // 4. VERIFICAÇÃO DE PAGAMENTO
+    // 1. Verificação de Pagamento
     if (!data.paid) {
       return (
-        <main className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="text-center p-10 bg-white rounded-2xl shadow-sm">
-            <h2 className="text-2xl font-bold text-pink-500">Quase lá! ❤️</h2>
-            <p className="text-gray-500 mt-2">Aguardando a confirmação do pagamento...</p>
+        <main className="min-h-screen flex items-center justify-center bg-pink-50 p-6">
+          <div className="text-center p-10 bg-white rounded-[2.5rem] shadow-xl max-w-sm w-full border-4 border-white">
+            <div className="text-4xl mb-4 animate-bounce">⏳</div>
+            <h2 className="text-2xl font-bold text-pink-600">Quase lá! ❤️</h2>
+            <p className="text-gray-500 mt-2">Estamos processando o seu Pix. Assim que aprovado, o presente aparecerá aqui!</p>
+            <div className="mt-6 h-2 w-full bg-pink-100 rounded-full overflow-hidden">
+              <div className="h-full bg-pink-500 animate-pulse w-2/3"></div>
+            </div>
           </div>
         </main>
       );
     }
 
-    // 5. MONTAGEM DA URL DA IA
-    const imageUrl = `https://image.pollinations.ai/prompt/${data.imagePrompt}?width=1080&height=1080&model=flux&seed=${data.seed}`;
+    // 2. Montagem dos Recursos
+    const seed = data.seed || Math.floor(Math.random() * 1000000);
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(data.imagePrompt)}?width=1080&height=1080&model=flux&seed=${seed}`;
+    const hasQuiz = data.quiz && data.quiz.length > 0;
 
     return (
       <main
-        className="min-h-screen flex items-center justify-center p-6"
-        style={{ backgroundColor: `${data.themeColor}15` }}
+        className="min-h-screen flex items-center justify-center p-4 transition-colors duration-1000"
+        style={{ backgroundColor: `${data.themeColor}20` }}
       >
-        <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-white">
-          <img
-            src={imageUrl}
-            alt="Ilustração do Casal"
-            className="w-full aspect-square object-cover"
-          />
+        <div className="max-w-md w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden border-8 border-white relative">
 
-          <div className="p-10 text-center">
-            <h1 className="text-3xl font-serif font-bold mb-4" style={{ color: data.themeColor }}>
-              Para: {data.couple}
-            </h1>
+          {/* Se tiver Quiz, ele cobre o conteúdo até ser respondido */}
+          {hasQuiz ? (
+            <QuizWrapper
+              quiz={data.quiz!}
+              themeColor={data.themeColor}
+              couple={data.couple}
+            >
+              {/* O conteúdo abaixo só aparece após o Quiz ser resolvido */}
+              <LoveContent data={data} imageUrl={imageUrl} />
+            </QuizWrapper>
+          ) : (
+            <LoveContent data={data} imageUrl={imageUrl} />
+          )}
 
-            <p className="text-gray-700 leading-relaxed text-lg italic">
-              "{data.letter}"
-            </p>
-
-            <div className="mt-8 pt-6 border-t border-gray-100 text-2xl">
-              ❤️
-            </div>
-
-            {/* <iframe
-              width="100%"
-              height="315"
-              src="https://www.youtube.com/embed/uWRlisQu4fo"
-              title="YouTube video player"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="mt-6 rounded-lg"
-            ></iframe> */}
-          </div>
         </div>
       </main>
     );
 
   } catch (error) {
-    // Captura erros de configuração do Firebase ou rede
     console.error("Erro interno:", error);
     notFound();
   }
+}
+
+// Componente Interno para organizar o conteúdo final
+function LoveContent({ data, imageUrl }: { data: LoveData, imageUrl: string }) {
+  return (
+    <div className="animate-in fade-in zoom-in duration-1000">
+      <img
+        src={imageUrl}
+        alt="Nossa foto"
+        className="w-full aspect-square object-cover"
+      />
+
+      {data.spotifyId && (
+        <div className="px-4 -mt-10 relative z-10">
+          <iframe
+            src={`https://open.spotify.com/embed/track/${data.spotifyId}?utm_source=generator&theme=0`}
+            width="100%"
+            height="80"
+            frameBorder="0"
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            className="rounded-2xl shadow-lg"
+          ></iframe>
+        </div>
+      )}
+
+      <div className="p-8 text-center space-y-4">
+        <h1 className="text-3xl font-serif font-bold" style={{ color: data.themeColor }}>
+          Para: {data.couple}
+        </h1>
+
+        <div className="relative">
+          <span className="text-4xl absolute -top-4 -left-2 opacity-20">"</span>
+          <p className="text-gray-700 leading-relaxed text-lg italic px-4">
+            {data.letter}
+          </p>
+          <span className="text-4xl absolute -bottom-8 -right-2 opacity-20">"</span>
+        </div>
+
+        <div className="mt-12 text-2xl animate-pulse">❤️</div>
+      </div>
+    </div>
+  );
 }

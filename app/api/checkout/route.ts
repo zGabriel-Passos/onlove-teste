@@ -1,98 +1,51 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
+import { MercadoPagoConfig, Preference } from "mercadopago";
 
-export async function POST(request: Request) {
+// Configura o cliente (Certifique-se que o Token no .env está certo!)
+const client = new MercadoPagoConfig({
+    accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || ''
+});
+
+export async function POST(req: NextRequest) {
     try {
-        const { slug, couple, amount } = await request.json();
+        const { slug, couple, amount } = await req.json();
 
-        // ✅ Validações básicas
-        console.log("📨 Dados recebidos:", { slug, couple, amount });
+        // Pega a URL de onde veio a requisição (ex: http://localhost:3000)
+        const origin = req.headers.get("origin");
 
-        if (!slug || !couple || !amount) {
-            return NextResponse.json({ error: 'Faltam dados: slug, couple ou amount' }, { status: 400 });
-        }
+        const preference = new Preference(client);
 
-        const apiKey = process.env.ABACATEPAY_API_KEY;
-        const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000").trim().replace(/\/$/, "");
-
-        if (!apiKey) {
-            console.error("❌ ERRO: ABACATEPAY_API_KEY não definida no .env");
-            return NextResponse.json({ error: 'Faltando configuração no servidor' }, { status: 500 });
-        }
-
-        // Converte amount para centavos (inteiro)
-        const priceInCents = Math.round(parseFloat(String(amount)) * 100);
-
-        console.log("💰 Convertendo:", { amount, priceInCents });
-
-        // Montagem do payload seguindo a documentação da AbacatePay
-        const bodyPayload = {
-            frequency: "ONE_TIME",
-            methods: ["PIX"],
-            products: [
-                {
-                    externalId: String(slug).toLowerCase(),
-                    name: `Site LovePage: ${String(couple).substring(0, 40)}`,
-                    quantity: 1,
-                    price: priceInCents,
-                }
-            ],
-            returnUrl: `${baseUrl}/love/${slug}`,
-            completionUrl: `${baseUrl}/love/${slug}?status=paid`,
-        };
-
-        console.log("📤 Enviando para AbacatePay...");
-
-        const response = await fetch('https://api.abacatepay.com/v1/billing/create', {
-            method: 'POST',
-            headers: {
-                "Content-Type": 'application/json',
-                "Accept": 'application/json',
-                "Authorization": `Bearer ${apiKey}`,
+        const createdPreference = await preference.create({
+            body: {
+                external_reference: slug, // Usamos o slug para identificar no Webhook
+                items: [
+                    {
+                        id: slug,
+                        title: `Site do Casal: ${couple}`,
+                        quantity: 1,
+                        unit_price: Number(amount),
+                        currency_id: "BRL",
+                        category_id: "others",
+                    },
+                ],
+                auto_return: "approved",
+                back_urls: {
+                    success: "https://www.google.com",
+                    failure: "https://www.google.com",
+                    pending: "https://www.google.com",
+                  },
             },
-            body: JSON.stringify(bodyPayload)
         });
 
-        const responseText = await response.text();
-        console.log("📥 Resposta bruta do gateway (status", response.status + "):", responseText);
-
-        let resData: any;
-        try {
-            resData = JSON.parse(responseText);
-        } catch (e) {
-            return NextResponse.json({
-                error: "Resposta inválida da AbacatePay",
-                rawResponse: responseText
-            }, { status: 500 });
+        if (!createdPreference.init_point) {
+            throw new Error("Mercado Pago não gerou o link de pagamento.");
         }
 
-        if (!response.ok) {
-            const errorMsg = resData?.message || resData?.error || "Erro na integradora";
-            return NextResponse.json({
-                error: "Dados recusados pela AbacatePay",
-                message: errorMsg
-            }, { status: 400 });
-        }
+        // Retornamos a URL para o seu frontend redirecionar
+        return NextResponse.json({ url: createdPreference.init_point });
 
-        // A URL da AbacatePay costuma vir em resData.data.url ou apenas resData.url
-        const checkoutUrl = resData?.data?.url || resData?.url;
-
-        if (!checkoutUrl) {
-            throw new Error("URL de checkout não encontrada na resposta");
-        }
-
-        console.log("✅ Sucesso! URL gerada:", checkoutUrl);
-
-        // --- ESTE RETORNO É O QUE ESTAVA FALTANDO ---
-        return NextResponse.json({
-            url: checkoutUrl
-        });
-        // --------------------------------------------
-
-    } catch (error: any) {
-        console.error("💥 Erro crítico no servidor:", error);
-        return NextResponse.json({
-            error: "Erro interno no servidor",
-            details: error.message
-        }, { status: 500 });
+    } catch (err: any) {
+        console.error("❌ Erro MP:", err);
+        return NextResponse.json({ error: err.message }, { status: 400 });
     }
 }

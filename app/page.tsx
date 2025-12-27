@@ -14,8 +14,14 @@ export default function CriarSite() {
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^\w\s-]/g, '')
       .replace(/\s+/g, '-')
-      .replace(/-+/g, '-') // Evita múltiplos hífens seguidos
+      .replace(/-+/g, '-')
       .trim();
+  };
+
+  const extrairSpotifyId = (url: string) => {
+    if (!url) return "";
+    const match = url.match(/track\/([a-zA-Z0-9]+)/);
+    return match ? match[1] : url.trim();
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -27,92 +33,109 @@ export default function CriarSite() {
     const coupleName = formData.get('couple') as string;
     const slug = criarSlug(coupleName);
 
+    const spotifyUrl = formData.get('spotifyUrl') as string;
+    const spotifyId = extrairSpotifyId(spotifyUrl);
+
+    // Coleta dados do Quiz (Perguntas Dinâmicas)
+    const quizData = [
+      {
+        pergunta: formData.get('p1'),
+        resposta: formData.get('r1')?.toString().toLowerCase().trim()
+      },
+      {
+        pergunta: formData.get('p2'),
+        resposta: formData.get('r2')?.toString().toLowerCase().trim()
+      },
+    ];
+
     try {
-      // 1. Salva no Firebase primeiro
+      // 1. Salva no Firebase
       await setDoc(doc(db, "sites", slug), {
         couple: coupleName,
         letter: formData.get('letter'),
         themeColor: formData.get('color'),
         imagePrompt: formData.get('prompt'),
-        seed: Math.floor(Math.random() * 1000),
+        spotifyId: spotifyId,
         paid: false,
-        createdAt: new Date()
+        createdAt: new Date(),
+        quiz: quizData // Agora salva as perguntas!
       });
 
-      // 2. Tenta gerar o pagamento
+      // 2. Chamada da API
       const response = await fetch('/api/checkout', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug: slug,
           couple: coupleName,
-          amount: 10, // Valor fixo de R$ 10,00
+          amount: 0.20,
         }),
       });
 
-      let data;
-      try {
-        data = await response.json();
-      } catch (e) {
-        console.error('Erro ao parsear resposta do servidor:', e);
-        throw new Error(`Erro do servidor (status ${response.status}). Verifique o console do servidor!`);
-      }
+      const data = await response.json();
 
       if (response.ok && data.url) {
         window.location.href = data.url;
       } else {
-        const msg = data.message || data.error || "Erro desconhecido";
-        throw new Error(`AbacatePay diz: ${msg}`);
+        // Se der erro 400, o console vai mostrar a mensagem real aqui
+        console.error("Erro retornado pela API:", data);
+        throw new Error(data.error || "Erro ao gerar link de pagamento");
       }
 
     } catch (error: any) {
-      console.error(error);
-      alert(error.message);
+      console.error("Erro no Processo:", error);
+      alert("Ops! " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-pink-50 flex items-center justify-center p-4">
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-4xl shadow-2xl max-w-md w-full space-y-5 border border-pink-100">
+    <main className="min-h-screen bg-pink-50 flex items-center justify-center p-4 py-12">
+      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-[2.5rem] shadow-2xl max-w-md w-full space-y-5 border border-pink-100">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-pink-600">LovePage ❤️</h1>
           <p className="text-gray-500 text-sm mt-1">Crie um site eterno para o seu amor</p>
         </div>
 
         <div className="space-y-4">
-          <div>
-            <label className="text-xs font-bold uppercase text-gray-400 ml-1">Nomes do Casal</label>
-            <input name="couple" required className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-pink-500 text-black" placeholder="Ex: Pedro & Ana" />
-          </div>
+          <section className="space-y-3">
+            <h2 className="text-sm font-black text-pink-400 uppercase tracking-widest border-b border-pink-50 pb-1">Básico</h2>
+            <input name="couple" required className="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-pink-500 text-black" placeholder="Nomes: Pedro & Ana" />
+            <textarea name="letter" required className="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-pink-500 text-black" rows={3} placeholder="Sua cartinha de amor..." />
+          </section>
 
-          <div>
-            <label className="text-xs font-bold uppercase text-gray-400 ml-1">Sua Cartinha</label>
-            <textarea name="letter" required className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-pink-500 text-black" rows={3} placeholder="Escreva algo especial..." />
-          </div>
-
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="text-xs font-bold uppercase text-gray-400 ml-1">Cor do Site</label>
-              <input name="color" type="color" defaultValue="#E91E63" className="w-full h-12 bg-gray-50 rounded-xl p-1 cursor-pointer" />
+          <section className="space-y-3">
+            <h2 className="text-sm font-black text-pink-400 uppercase tracking-widest border-b border-pink-50 pb-1">O Quiz do Casal</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <input name="p1" required className="p-3 bg-gray-50 rounded-xl text-sm text-black" placeholder="Pergunta 1 (Ex: Onde nos conhecemos?)" />
+              <input name="r1" required className="p-3 bg-gray-100 rounded-xl text-sm text-black" placeholder="Resposta" />
             </div>
-          </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input name="p2" required className="p-3 bg-gray-50 rounded-xl text-sm text-black" placeholder="Pergunta 2" />
+              <input name="r2" required className="p-3 bg-gray-100 rounded-xl text-sm text-black" placeholder="Resposta" />
+            </div>
+          </section>
 
-          <div>
-            <label className="text-xs font-bold uppercase text-gray-400 ml-1">Estilo da Foto (IA)</label>
-            <input name="prompt" required className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-pink-500 text-black" placeholder="Ex: casal estilo disney pixar" />
-          </div>
+          <section className="space-y-3">
+            <h2 className="text-sm font-black text-pink-400 uppercase tracking-widest border-b border-pink-50 pb-1">Personalização</h2>
+            <input name="spotifyUrl" className="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-pink-500 text-black" placeholder="Link da Música no Spotify" />
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-400 font-bold">COR:</label>
+              <input name="color" type="color" defaultValue="#E91E63" className="flex-1 h-10 bg-transparent cursor-pointer" />
+            </div>
+            <input name="prompt" required className="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-pink-500 text-black" placeholder="Estilo da foto (Ex: Disney Pixar)" />
+          </section>
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-pink-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-pink-200 hover:bg-pink-700 active:scale-95 transition-all disabled:opacity-50"
+          className="w-full bg-pink-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl hover:bg-pink-700 transition-all disabled:opacity-50"
         >
-          {loading ? 'Criando sua Magia...' : 'Gerar Site e Pagar Pix'}
+          {loading ? 'Processando...' : 'Gerar Site e Pagar R$ 10'}
         </button>
       </form>
     </main>
   );
-} // <--- Esta chave fecha o export default function CriarSite()
+}
