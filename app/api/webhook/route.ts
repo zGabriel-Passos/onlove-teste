@@ -1,37 +1,52 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 
-export async function POST(request: Request) {
-    try {
-        // 1. Recebe os dados do AbacatePay
-        const body = await request.json();
-        console.log("🪝 Webhook recebido:", JSON.stringify(body, null, 2));
+// Configuração usando o nome exato da variável que está na sua Vercel
+const client = new MercadoPagoConfig({
+  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || ''
+});
 
-        // 2. Verifica se o status é de sucesso
-        // Na AbacatePay, geralmente o status é 'confirmed' ou 'paid'
-        const status = body.data?.status;
-        const slug = body.data?.products?.[0]?.externalId; // Usamos o slug que enviamos no checkout
+export async function POST(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
 
-        if (status === 'finished' || status === 'confirmed' || status === 'paid') {
-            if (slug) {
-                console.log(`✅ Pagamento aprovado para o site: ${slug}`);
+    // O Mercado Pago envia o ID do pagamento e o tipo da notificação
+    const id = searchParams.get('data.id') || searchParams.get('id');
+    const type = searchParams.get('type');
 
-                // 3. Atualiza o Firebase para paid: true
-                const siteRef = doc(db, "sites", slug);
-                await updateDoc(siteRef, {
-                    paid: true,
-                    updatedAt: new Date()
-                });
+    // Só processamos se a notificação for do tipo 'payment' e tiver um ID
+    if (type === 'payment' && id) {
+      const paymentClient = new Payment(client);
+      const payment = await paymentClient.get({ id });
 
-                return NextResponse.json({ message: "Firebase atualizado com sucesso" });
-            }
+      // Verificamos se o status é 'approved' (pago e compensado)
+      if (payment.status === 'approved') {
+        // O external_reference é o 'slug' que enviamos na criação do checkout
+        const slug = payment.external_reference;
+
+        if (slug) {
+          const docRef = doc(db, "sites", slug);
+
+          // Atualiza o Firebase para liberar o site do casal
+          await updateDoc(docRef, {
+            paid: true,
+            updatedAt: new Date(),
+            mercadopagoPaymentId: id
+          });
+
+          console.log(`✅ Site liberado com sucesso: ${slug}`);
         }
-
-        return NextResponse.json({ message: "Webhook processado (sem alteração)" });
-
-    } catch (error: any) {
-        console.error("💥 Erro no Webhook:", error);
-        return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+      }
     }
+
+    // O Mercado Pago EXIGE um status 200 ou 201 para parar de enviar notificações
+    return NextResponse.json({ received: true }, { status: 200 });
+
+  } catch (error: any) {
+    console.error("❌ Erro no Webhook:", error.message);
+    // Mesmo com erro, retornamos 200 para evitar que o MP fique tentando infinitamente em caso de erro de código
+    return NextResponse.json({ error: error.message }, { status: 200 });
+  }
 }
