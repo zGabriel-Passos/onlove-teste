@@ -1,11 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Adicionado useEffect
 import { db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore'; // Adicionado onSnapshot
+import { useRouter } from 'next/navigation'; // Adicionado useRouter
 
 export default function CriarSite() {
   const [loading, setLoading] = useState(false);
+  const [currentSlug, setCurrentSlug] = useState<string | null>(null); // Estado para monitorar o slug atual
+  const router = useRouter();
+
+  // ESCUTADOR EM TEMPO REAL: Monitora se o pagamento foi aprovado
+  useEffect(() => {
+    if (!currentSlug) return;
+
+    // Fica vigiando o documento no Firebase
+    const unsub = onSnapshot(doc(db, "sites", currentSlug), (docSnap) => {
+      const data = docSnap.data();
+
+      // Assim que o Webhook do Mercado Pago avisar o Firebase e o 'paid' virar true:
+      if (data?.paid === true) {
+        console.log("💰 Pagamento detectado! Redirecionando...");
+        router.push(`/love/${currentSlug}?status=success`);
+      }
+    });
+
+    return () => unsub(); // Limpa o monitoramento ao sair
+  }, [currentSlug, router]);
 
   const criarSlug = (texto: string) => {
     return texto
@@ -32,11 +53,11 @@ export default function CriarSite() {
     const formData = new FormData(e.currentTarget);
     const coupleName = formData.get('couple') as string;
     const slug = criarSlug(coupleName);
+    setCurrentSlug(slug); // Salva o slug para o useEffect começar a vigiar
 
     const spotifyUrl = formData.get('spotifyUrl') as string;
     const spotifyId = extrairSpotifyId(spotifyUrl);
 
-    // Coleta dados do Quiz (Perguntas Dinâmicas)
     const quizData = [
       {
         pergunta: formData.get('p1'),
@@ -49,7 +70,6 @@ export default function CriarSite() {
     ];
 
     try {
-      // 1. Salva no Firebase
       await setDoc(doc(db, "sites", slug), {
         couple: coupleName,
         letter: formData.get('letter'),
@@ -58,36 +78,35 @@ export default function CriarSite() {
         spotifyId: spotifyId,
         paid: false,
         createdAt: new Date(),
-        quiz: quizData // Agora salva as perguntas!
+        quiz: quizData
       });
 
-      // 2. Chamada da API
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug: slug,
           couple: coupleName,
-          amount: 0.01,
+          amount: 1.00, // Recomendado R$ 1,00 para teste de webhook estável
         }),
       });
 
       const data = await response.json();
 
       if (response.ok && data.url) {
-        window.location.href = data.url;
+        // ABRIR EM NOVA ABA: Mantém seu site aberto vigiando o pagamento
+        window.open(data.url, '_blank');
+        alert("Aguardando pagamento... Assim que concluir o Pix, esta página será atualizada!");
       } else {
-        // Se der erro 400, o console vai mostrar a mensagem real aqui
-        console.error("Erro retornado pela API:", data);
         throw new Error(data.error || "Erro ao gerar link de pagamento");
       }
 
     } catch (error: any) {
       console.error("Erro no Processo:", error);
       alert("Ops! " + error.message);
-    } finally {
       setLoading(false);
     }
+    // Não damos setLoading(false) aqui para o botão continuar em "Processando" até o redirecionamento
   };
 
   return (
@@ -95,8 +114,12 @@ export default function CriarSite() {
       <form onSubmit={handleSubmit} className="bg-white p-8 rounded-[2.5rem] shadow-2xl max-w-md w-full space-y-5 border border-pink-100">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-pink-600">LovePage ❤️</h1>
-          <p className="text-gray-500 text-sm mt-1">Crie um site eterno para o seu amor</p>
+          <p className="text-gray-500 text-sm mt-1">
+            {loading ? 'Aguardando confirmação do Pix...' : 'Crie um site eterno para o seu amor'}
+          </p>
         </div>
+
+        {/* ... Resto do seu formulário igual ao original ... */}
 
         <div className="space-y-4">
           <section className="space-y-3">
@@ -108,7 +131,7 @@ export default function CriarSite() {
           <section className="space-y-3">
             <h2 className="text-sm font-black text-pink-400 uppercase tracking-widest border-b border-pink-50 pb-1">O Quiz do Casal</h2>
             <div className="grid grid-cols-2 gap-2">
-              <input name="p1" required className="p-3 bg-gray-50 rounded-xl text-sm text-black" placeholder="Pergunta 1 (Ex: Onde nos conhecemos?)" />
+              <input name="p1" required className="p-3 bg-gray-50 rounded-xl text-sm text-black" placeholder="Pergunta 1" />
               <input name="r1" required className="p-3 bg-gray-100 rounded-xl text-sm text-black" placeholder="Resposta" />
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -124,7 +147,7 @@ export default function CriarSite() {
               <label className="text-sm text-gray-400 font-bold">COR:</label>
               <input name="color" type="color" defaultValue="#E91E63" className="flex-1 h-10 bg-transparent cursor-pointer" />
             </div>
-            <input name="prompt" required className="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-pink-500 text-black" placeholder="Estilo da foto (Ex: Disney Pixar)" />
+            <input name="prompt" required className="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-pink-500 text-black" placeholder="Estilo da foto" />
           </section>
         </div>
 
@@ -133,7 +156,7 @@ export default function CriarSite() {
           disabled={loading}
           className="w-full bg-pink-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl hover:bg-pink-700 transition-all disabled:opacity-50"
         >
-          {loading ? 'Processando...' : 'Gerar Site e Pagar R$ 10'}
+          {loading ? 'Aguardando Pagamento...' : 'Gerar Site e Pagar R$ 10'}
         </button>
       </form>
     </main>
