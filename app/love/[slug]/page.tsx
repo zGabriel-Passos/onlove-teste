@@ -49,7 +49,7 @@ export default async function LovePage({ params }: PageProps) {
 
     // 2. Montagem dos Recursos
     const seed = data.seed || Math.floor(Math.random() * 1000000);
-    const imageUrl = `https://image.pollinations.ai/prompt/${data.imagePrompt}?width=1080&height=1080&model=flux&seed=${seed}`;
+    const imageUrl = `https://image.pollinations.ai/prompt/${data.imagePrompt}?width=400&height=400&model=flux&seed=${seed}`;
     const hasQuiz = data.quiz && data.quiz.length > 0;
 
     return (
