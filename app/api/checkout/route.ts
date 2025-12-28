@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
         const { slug, couple, amount } = await req.json();
 
         // URL oficial do seu projeto no Firebase
-        const baseUrl = "https://onlove.vercel.app/";
+        const baseUrl = "https://onlove.vercel.app";
 
         const preference = new Preference(client);
 

@@ -14,19 +14,15 @@ export default function CriarSite() {
   useEffect(() => {
     if (!currentSlug) return;
 
-    // Fica vigiando o documento no Firebase
     const unsub = onSnapshot(doc(db, "sites", currentSlug), (docSnap) => {
-      const data = docSnap.data();
-
-      // Assim que o Webhook do Mercado Pago avisar o Firebase e o 'paid' virar true:
-      if (data?.paid === true) {
-        console.log("💰 Pagamento detectado! Redirecionando...");
-        router.push(`/love/${currentSlug}?status=success`);
+      if (docSnap.data()?.paid === true) {
+        // No momento que o banco mudar, o seu site redireciona sozinho!
+        router.push(`/love/${currentSlug}`);
       }
     });
 
-    return () => unsub(); // Limpa o monitoramento ao sair
-  }, [currentSlug, router]);
+    return () => unsub();
+  }, [currentSlug]);
 
   const criarSlug = (texto: string) => {
     return texto
