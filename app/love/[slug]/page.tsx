@@ -2,6 +2,8 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { notFound } from "next/navigation";
 import QuizWrapper from "@/components/QuizWrapper"; // Vamos criar este componente
+import Snowfall from "@/components/Snowfall"; // Vamos criar este componente
+
 
 interface LoveData {
   couple: string;
@@ -57,6 +59,8 @@ export default async function LovePage({ params }: PageProps) {
         className="min-h-screen flex items-center justify-center p-4 transition-colors duration-1000"
         style={{ backgroundColor: `${data.themeColor}20` }}
       >
+        <Snowfall />
+
         <div className="max-w-md w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden border-8 border-white relative">
 
           {/* Se tiver Quiz, ele cobre o conteúdo até ser respondido */}
