@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
                     },
                 ],
                 // Configuração de redirecionamento automático
+                binary_mode: true,
                 auto_return: "approved",
                 back_urls: {
                     success: `${baseUrl}/love/${slug}?status=success`,

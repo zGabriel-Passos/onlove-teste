@@ -94,13 +94,20 @@ export default function CriarSite() {
       const data = await response.json();
 
       if (response.ok && data.url) {
-        // ABRIR EM NOVA ABA: Mantém seu site aberto vigiando o pagamento
-        window.open(data.url, '_blank');
-        alert("Aguardando pagamento... Assim que concluir o Pix, esta página será atualizada!");
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        if (isMobile) {
+          // No celular, redireciona na mesma aba para o auto_return ser mais eficaz
+          window.location.href = data.url;
+        } else {
+          // No PC, abre em nova aba e mantém o seu site vigiando o Firebase
+          window.open(data.url, '_blank');
+          // REMOVIDO: o throw new Error daqui
+        }
       } else {
+        // O erro só deve ser lançado se a resposta NÃO for ok
         throw new Error(data.error || "Erro ao gerar link de pagamento");
       }
-
     } catch (error: any) {
       console.error("Erro no Processo:", error);
       alert("Ops! " + error.message);
