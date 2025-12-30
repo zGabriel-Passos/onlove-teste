@@ -4,7 +4,7 @@ import Snowfall from 'react-snowfall'
 export default function Page() {
     return (
         <div>
-            <Snowfall color='white' />
+            <Snowfall color='red' />
         </div>
     );
 }

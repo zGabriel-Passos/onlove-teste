@@ -1,9 +1,9 @@
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { notFound } from "next/navigation";
-import QuizWrapper from "@/components/QuizWrapper"; // Vamos criar este componente
-import Snowfall from "@/components/Snowfall"; // Vamos criar este componente
-
+import QuizWrapper from "@/components/QuizWrapper";
+import Snowfall from "@/components/Snowfall";
+import Image from "next/image";
 
 interface LoveData {
   couple: string;
@@ -11,13 +11,25 @@ interface LoveData {
   letter: string;
   paid: boolean;
   themeColor: string;
-  spotifyId?: string;
+  youtubeUrl?: string;
   seed?: number;
   quiz?: { pergunta: string; resposta: string }[];
 }
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+}
+
+// Função utilitária para converter URL do YouTube para Embed
+function getEmbedUrl(url?: string) {
+  if (!url) return null;
+  let videoId = "";
+  if (url.includes("v=")) {
+    videoId = url.split("v=")[1].split("&")[0];
+  } else if (url.includes("youtu.be/")) {
+    videoId = url.split("youtu.be/")[1].split("?")[0];
+  }
+  return videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}` : null;
 }
 
 export default async function LovePage({ params }: PageProps) {
@@ -33,7 +45,6 @@ export default async function LovePage({ params }: PageProps) {
 
     const data = docSnap.data() as LoveData;
 
-    // 1. Verificação de Pagamento
     if (!data.paid) {
       return (
         <main className="min-h-screen flex items-center justify-center bg-pink-50 p-6">
@@ -49,10 +60,10 @@ export default async function LovePage({ params }: PageProps) {
       );
     }
 
-    // 2. Montagem dos Recursos
-    const seed = data.seed || Math.floor(Math.random() * 1000000);
-    const imageUrl = `https://image.pollinations.ai/prompt/${data.imagePrompt}?width=400&height=400&model=flux&seed=${seed}`;
+    const seed = data.seed || 0;
+    const imageUrl = `/assets/image${seed}.png`; // Dinâmico conforme o seed
     const hasQuiz = data.quiz && data.quiz.length > 0;
+    const embedUrl = getEmbedUrl(data.youtubeUrl);
 
     return (
       <main
@@ -62,21 +73,17 @@ export default async function LovePage({ params }: PageProps) {
         <Snowfall />
 
         <div className="max-w-md w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden border-8 border-white relative">
-
-          {/* Se tiver Quiz, ele cobre o conteúdo até ser respondido */}
           {hasQuiz ? (
             <QuizWrapper
               quiz={data.quiz!}
               themeColor={data.themeColor}
               couple={data.couple}
             >
-              {/* O conteúdo abaixo só aparece após o Quiz ser resolvido */}
-              <LoveContent data={data} imageUrl={imageUrl} />
+              <LoveContent data={data} imageUrl={imageUrl} embedUrl={embedUrl} />
             </QuizWrapper>
           ) : (
-            <LoveContent data={data} imageUrl={imageUrl} />
+            <LoveContent data={data} imageUrl={imageUrl} embedUrl={embedUrl} />
           )}
-
         </div>
       </main>
     );
@@ -87,43 +94,43 @@ export default async function LovePage({ params }: PageProps) {
   }
 }
 
-// Componente Interno para organizar o conteúdo final
-function LoveContent({ data, imageUrl }: { data: LoveData, imageUrl: string }) {
+function LoveContent({ data, imageUrl, embedUrl }: { data: LoveData, imageUrl: string, embedUrl: string | null }) {
   return (
     <div className="animate-in fade-in zoom-in duration-1000">
-      <img
+      <Image
         src={imageUrl}
+        width={500}
+        height={500}
         alt="Nossa foto"
         className="w-full aspect-square object-cover"
       />
 
-      {data.spotifyId && (
-        <div className="px-4 -mt-10 relative z-10">
-          <iframe
-            src={`https://open.spotify.com/embed/track/${data.spotifyId}?utm_source=generator&theme=0`}
-            width="100%"
-            height="80"
-            frameBorder="0"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            className="rounded-2xl shadow-lg"
-          ></iframe>
-        </div>
-      )}
-
-      <div className="p-8 text-center space-y-4">
+      <div className="p-8 text-center space-y-6">
         <h1 className="text-3xl font-serif font-bold" style={{ color: data.themeColor }}>
           Para: {data.couple}
         </h1>
 
         <div className="relative">
-          <span className="text-4xl absolute -top-4 -left-2 opacity-20">"</span>
-          <p className="text-gray-700 leading-relaxed text-lg italic px-4">
+          <span className="text-4xl absolute -top-4 -left-2 opacity-20" style={{ color: data.themeColor }}>"</span>
+          <p className="text-gray-700 leading-relaxed text-lg italic px-4 whitespace-pre-wrap">
             {data.letter}
           </p>
-          <span className="text-4xl absolute -bottom-8 -right-2 opacity-20">"</span>
+          <span className="text-4xl absolute -bottom-8 -right-2 opacity-20" style={{ color: data.themeColor }}>"</span>
         </div>
 
-        <div className="mt-12 text-2xl animate-pulse">❤️</div>
+        {embedUrl && (
+          <div className="rounded-3x1 overflow-hidden shadow-lg bg-black aspect-video">
+            <iframe
+              src={embedUrl}
+              title="Sua música"
+              allow="autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="w-full h-50"
+            ></iframe>
+          </div>
+        )}
+
+        <div className="pt-4 text-2xl animate-pulse">❤️</div>
       </div>
     </div>
   );
