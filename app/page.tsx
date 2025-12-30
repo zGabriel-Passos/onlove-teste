@@ -146,7 +146,7 @@ export default function CriarSite() {
             {/* <input name="prompt" required className="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-pink-500 text-black" placeholder="Estilo da foto" /> */}
           </section>
           <span className='text-sm text-gray-600 text-center block'>
-            *O site estará ao completar o pagamento, o MercadoPago pode demorar para confirmar*
+            *O site já estará pronto ao completar o pagamento, o MercadoPago pode demorar para confirmar*
           </span>
         </div>
 
