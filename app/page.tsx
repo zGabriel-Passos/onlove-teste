@@ -1,22 +1,19 @@
 'use client';
-
-import { useState, useEffect } from 'react'; // Adicionado useEffect
+import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore'; // Adicionado onSnapshot
-import { useRouter } from 'next/navigation'; // Adicionado useRouter
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
 
 export default function CriarSite() {
   const [loading, setLoading] = useState(false);
-  const [currentSlug, setCurrentSlug] = useState<string | null>(null); // Estado para monitorar o slug atual
+  const [currentSlug, setCurrentSlug] = useState<string | null>(null);
   const router = useRouter();
 
-  // ESCUTADOR EM TEMPO REAL: Monitora se o pagamento foi aprovado
   useEffect(() => {
     if (!currentSlug) return;
 
     const unsub = onSnapshot(doc(db, "sites", currentSlug), (docSnap) => {
       if (docSnap.data()?.paid === true) {
-        // No momento que o banco mudar, o seu site redireciona sozinho!
         router.push(`/love/${currentSlug}`);
       }
     });
@@ -43,7 +40,7 @@ export default function CriarSite() {
     const formData = new FormData(e.currentTarget);
     const coupleName = formData.get('couple') as string;
     const slug = criarSlug(coupleName + Math.floor(Math.random() * 100000));
-    setCurrentSlug(slug); // Salva o slug para o useEffect começar a vigiar
+    setCurrentSlug(slug);
 
     const youtubeUrl = formData.get('youtubeUrl') as string;
 
@@ -76,7 +73,7 @@ export default function CriarSite() {
         body: JSON.stringify({
           slug: slug,
           couple: coupleName,
-          amount: 1.00, // Recomendado R$ 1,00 para teste de webhook estável
+          amount: 11.99,
         }),
       });
 
@@ -86,15 +83,11 @@ export default function CriarSite() {
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
         if (isMobile) {
-          // No celular, redireciona na mesma aba para o auto_return ser mais eficaz
           window.location.href = data.url;
         } else {
-          // No PC, abre em nova aba e mantém o seu site vigiando o Firebase
           window.open(data.url, '_blank');
-          // REMOVIDO: o throw new Error daqui
         }
       } else {
-        // O erro só deve ser lançado se a resposta NÃO for ok
         throw new Error(data.error || "Erro ao gerar link de pagamento");
       }
     } catch (error: any) {
@@ -102,20 +95,18 @@ export default function CriarSite() {
       alert("Ops! " + error.message);
       setLoading(false);
     }
-    // Não damos setLoading(false) aqui para o botão continuar em "Processando" até o redirecionamento
   };
 
   return (
-    <main className="min-h-screen bg-pink-50 flex items-center justify-center p-4 py-12">
+    <main className="min-h-screen bg-pink-50 flex items-center flex-col justify-center p-4 py-12">
       <form onSubmit={handleSubmit} className="bg-white p-8 rounded-[2.5rem] shadow-2xl max-w-md w-full space-y-5 border border-pink-100">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-pink-600">OnLoveYou ❤️</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {loading ? 'Aguardando confirmação do Pix...' : 'Crie um site eterno para o seu amor'}
+            {loading ? 'Aguardando confirmação do Pix...' : 'Crie um site eterno em 2 minutos para o seu amor!'}
           </p>
         </div>
 
-        {/* ... Resto do seu formulário igual ao original ... */}
 
         <div className="space-y-4">
           <section className="space-y-3">
@@ -155,9 +146,17 @@ export default function CriarSite() {
           disabled={loading}
           className="w-full bg-pink-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl hover:bg-pink-700 transition-all disabled:opacity-50 cursor-pointer border-2 border-b-4 border-black hover:border-b-2"
         >
-          {loading ? 'Aguardando Pagamento...' : 'Gerar Site e Pagar R$ 10'}
+          {loading ? 'Aguardando Pagamento...' : 'Gerar Site e Pagar R$ 11,99'}
         </button>
       </form>
+
+      <footer className='mt-2 text-center'>
+        <div>
+          <p>
+            &copy; {new Date().getFullYear()} <strong>OnLoveYou</strong>. Todos os direitos reservados.
+          </p>
+        </div>
+      </footer>
     </main>
   );
 }

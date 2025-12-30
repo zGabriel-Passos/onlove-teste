@@ -34,13 +34,13 @@ export default function QuizWrapper({ quiz, themeColor, couple, children }: any)
                 <input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    className="w-full p-4 bg-gray-50 rounded-2xl border-2 outline-none transition-all focus:border-pink-400 text-black"
+                    className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-b-4 outline-none transition-all focus:border-pink-400 text-black"
                     placeholder="Sua resposta..."
                     onKeyDown={(e) => e.key === 'Enter' && checkAnswer()}
                 />
                 <button
                     onClick={checkAnswer}
-                    className="w-full py-4 rounded-2xl text-white font-bold shadow-lg"
+                    className="w-full py-4 border-2 border-b-4 border-black rounded-2xl text-white font-bold shadow-lg cursor-pointer hover:border-b-2"
                     style={{ backgroundColor: themeColor }}
                 >
                     Próxima Pergunta
