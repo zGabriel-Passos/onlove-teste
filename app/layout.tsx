@@ -27,6 +27,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <link rel="shortcut icon" href="assets/heart-arrow.png" type="image/x-icon" />
         {children}
       </body>
     </html>
