@@ -25,6 +25,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={`${poppins.className} ${roboto.className}`}>
+        <link rel="shortcut icon" href="assets/heart-arrow.png" type="image/x-icon" />
         {children}
       </body>
     </html>
