@@ -73,7 +73,7 @@ export default function CriarSite() {
         body: JSON.stringify({
           slug: slug,
           couple: coupleName,
-          amount: 11.99,
+          amount: 1.00,
         }),
       });
 
